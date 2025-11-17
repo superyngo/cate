@@ -1,0 +1,23 @@
+[package]
+name = "cate"
+version = "0.1.0"
+edition = "2021"
+authors = ["wen"]
+description = "A lightweight CLI tool to display file contents with encoding support"
+license = "MIT"
+
+[dependencies]
+encoding_rs = "0.8"    # 編碼處理
+pico-args = "0.5"      # CLI 參數解析
+anyhow = "1.0"         # 錯誤處理
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winnls"] }
+
+[profile.release]
+strip = true           # 移除符號以減小二進制文件大小
+lto = true             # 啟用鏈接時優化
+opt-level = "z"        # 優化文件大小
+codegen-units = 1      # 單編譯單元
+panic = "abort"        # 減少 panic 處理代碼
+incremental = false    # 避免未使用的編譯 cache
