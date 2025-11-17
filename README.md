@@ -13,11 +13,31 @@ A lightweight CLI tool to display file contents with encoding support - like `ca
 
 ## Installation
 
-### From Binary Releases
+### Quick Install (Recommended)
+
+#### Linux/macOS
+```bash
+curl -fsSL https://raw.githubusercontent.com/superyngo/cate/main/install.sh | bash
+```
+
+#### Windows (PowerShell)
+```powershell
+irm https://raw.githubusercontent.com/superyngo/cate/main/install.ps1 | iex
+```
+
+The installation script will:
+- Automatically detect your platform and architecture
+- Download the latest release from GitHub
+- Install the binary to the appropriate location
+- Add it to your PATH automatically
+
+### Manual Installation
+
+#### From Binary Releases
 
 Download the appropriate binary for your platform from the [releases page](https://github.com/superyngo/cate/releases).
 
-#### Linux/macOS
+##### Linux/macOS
 ```bash
 # Extract the tarball
 tar xzf cate-*.tar.gz
@@ -29,7 +49,7 @@ sudo mv cate /usr/local/bin/
 chmod +x /usr/local/bin/cate
 ```
 
-#### Windows
+##### Windows
 Simply download `cate-windows-x86_64.exe` and rename it to `cate.exe`. Add it to your PATH for easy access.
 
 ### From Source
@@ -44,6 +64,22 @@ cargo build --release
 
 # Binary will be in target/release/cate (or cate.exe on Windows)
 ```
+
+## Uninstallation
+
+If you installed using the installation scripts, you can uninstall with:
+
+### Linux/macOS
+```bash
+curl -fsSL https://raw.githubusercontent.com/superyngo/cate/main/install.sh | bash -s uninstall
+```
+
+### Windows (PowerShell)
+```powershell
+irm https://raw.githubusercontent.com/superyngo/cate/main/install.ps1 | iex -Uninstall
+```
+
+For manual installations, simply remove the binary from your system.
 
 ## Usage
 
