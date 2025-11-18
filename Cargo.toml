@@ -16,6 +16,9 @@ winapi = { version = "0.3", features = ["winnls"] }
 
 
 [profile.release]
+# 注意：這些設定會被 GitHub Actions workflow 中的 Windows builds 覆蓋
+# - Windows builds: 使用環境變數覆蓋為溫和優化以避免防毒軟體誤報
+# - Linux/macOS builds: 直接使用以下激進優化以最小化檔案大小
 strip = true           # 移除符號以減小二進制文件大小
 lto = true             # 啟用鏈接時優化
 opt-level = "z"        # 優化文件大小

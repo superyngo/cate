@@ -21,6 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Linux builds - 使用 Cargo.toml 中的激進優化設定
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact_name: cate
@@ -53,16 +54,28 @@ jobs:
             target: aarch64-unknown-linux-musl
             artifact_name: cate
             asset_name: cate-linux-aarch64-musl
+          # Windows builds - 使用溫和優化以避免防毒軟體誤報
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_name: cate.exe
             asset_name: cate-windows-x86_64.exe
             rustflags: "-C target-feature=+crt-static"
+            opt_level: "3"
+            lto: "thin"
+            strip: "false"
+            codegen_units: "16"
+            panic: "unwind"
           - os: windows-latest
             target: i686-pc-windows-msvc
             artifact_name: cate.exe
             asset_name: cate-windows-i686.exe
             rustflags: "-C target-feature=+crt-static"
+            opt_level: "3"
+            lto: "thin"
+            strip: "false"
+            codegen_units: "16"
+            panic: "unwind"
+          # macOS builds - 使用 Cargo.toml 中的激進優化設定
           - os: macos-15-intel
             target: x86_64-apple-darwin
             artifact_name: cate
@@ -134,6 +147,11 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
         env:
           RUSTFLAGS: ${{ matrix.rustflags }}
+          CARGO_PROFILE_RELEASE_OPT_LEVEL: ${{ matrix.opt_level }}
+          CARGO_PROFILE_RELEASE_LTO: ${{ matrix.lto }}
+          CARGO_PROFILE_RELEASE_STRIP: ${{ matrix.strip }}
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ matrix.codegen_units }}
+          CARGO_PROFILE_RELEASE_PANIC: ${{ matrix.panic }}
 
       - name: Strip binary (Linux and macOS - x86)
         if: matrix.os != 'windows-latest' && matrix.target != 'armv7-unknown-linux-gnueabihf' && matrix.target != 'armv7-unknown-linux-musleabihf' && matrix.target != 'aarch64-unknown-linux-gnu' && matrix.target != 'aarch64-unknown-linux-musl'
