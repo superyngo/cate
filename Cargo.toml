@@ -14,6 +14,7 @@ anyhow = "1.0"         # 錯誤處理
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winnls"] }
 
+
 [profile.release]
 strip = true           # 移除符號以減小二進制文件大小
 lto = true             # 啟用鏈接時優化
