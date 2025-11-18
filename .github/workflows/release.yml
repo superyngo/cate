@@ -143,7 +143,8 @@ jobs:
             echo 'linker = "aarch64-linux-gnu-gcc"' >> ~/.cargo/config.toml
           fi
 
-      - name: Build
+      - name: Build (Windows)
+        if: matrix.os == 'windows-latest'
         run: cargo build --release --target ${{ matrix.target }}
         env:
           RUSTFLAGS: ${{ matrix.rustflags }}
@@ -152,6 +153,12 @@ jobs:
           CARGO_PROFILE_RELEASE_STRIP: ${{ matrix.strip }}
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ matrix.codegen_units }}
           CARGO_PROFILE_RELEASE_PANIC: ${{ matrix.panic }}
+
+      - name: Build (Linux and macOS)
+        if: matrix.os != 'windows-latest'
+        run: cargo build --release --target ${{ matrix.target }}
+        env:
+          RUSTFLAGS: ${{ matrix.rustflags }}
 
       - name: Strip binary (Linux and macOS - x86)
         if: matrix.os != 'windows-latest' && matrix.target != 'armv7-unknown-linux-gnueabihf' && matrix.target != 'armv7-unknown-linux-musleabihf' && matrix.target != 'aarch64-unknown-linux-gnu' && matrix.target != 'aarch64-unknown-linux-musl'

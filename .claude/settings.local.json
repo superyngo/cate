@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebSearch",
+      "WebFetch(domain:www.microsoft.com)",
+      "WebFetch(domain:www.signserver.org)",
+      "WebFetch(domain:ossign.org)",
+      "WebFetch(domain:about.signpath.io)",
+      "Bash(git tag:*)",
+      "Bash(git push:*)",
+      "Bash(git show:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\n修復非 Windows 平台的構建錯誤\n\n將 Build step 分為兩個步驟以避免空環境變量錯誤：\n- Build (Windows): 包含所有溫和編譯參數\n- Build (Linux and macOS): 使用標準設定\n\n修復錯誤: CARGO_PROFILE_RELEASE_OPT_LEVEL 空字符串導致的構建失敗\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
