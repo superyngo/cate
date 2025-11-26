@@ -1,93 +1,67 @@
 mod encoder;
+mod highlighter;
 mod printer;
 
 use anyhow::Result;
 use pico_args::Arguments;
+use std::io::Write;
 use std::path::PathBuf;
 
-#[derive(Debug)]
 struct Args {
-    file: Option<PathBuf>,
+    files: Vec<PathBuf>,
     encoding: Option<String>,
     show_line_numbers: bool,
     debug: bool,
+
+    // 語法高亮選項
+    no_highlight: bool,    // --no-highlight: 停用語法高亮
+    theme: Option<String>, // --theme: 指定主題
 }
 
 impl Args {
     fn parse() -> Result<Self> {
-        let mut pargs = Arguments::from_env();
+        let mut args = Arguments::from_env();
 
-        // 檢查是否有 --help
-        if pargs.contains(["-h", "--help"]) {
-            Self::print_help();
+        // 處理幫助和版本
+        if args.contains(["-h", "--help"]) {
+            print_help();
             std::process::exit(0);
         }
 
-        // 檢查是否有 --version
-        if pargs.contains(["-v", "--version"]) {
-            Self::print_version();
+        if args.contains(["-v", "--version"]) {
+            print_version();
             std::process::exit(0);
         }
 
-        // 檢查是否要列出編碼
-        if pargs.contains("--list-encodings") {
+        // 列出編碼
+        if args.contains("--list-encodings") {
             encoder::list_encodings();
             std::process::exit(0);
         }
 
-        let debug = pargs.contains("--debug");
-        let show_line_numbers = pargs.contains(["-n", "--number"]);
-        let encoding: Option<String> = pargs.opt_value_from_str(["-e", "--encoding"])?;
-
-        // 獲取文件名（可選）
-        let file: Option<PathBuf> = pargs.opt_free_from_str()?;
-
-        // 檢查未處理的參數
-        let remaining = pargs.finish();
-        if !remaining.is_empty() {
-            eprintln!("Warning: unused arguments {:?}", remaining);
+        // 列出主題
+        if args.contains("--list-themes") {
+            list_themes();
+            std::process::exit(0);
         }
 
-        Ok(Self {
-            file,
-            encoding,
-            show_line_numbers,
-            debug,
+        // 列出語法
+        if args.contains("--list-syntaxes") {
+            list_syntaxes();
+            std::process::exit(0);
+        }
+
+        Ok(Args {
+            encoding: args.opt_value_from_str(["-e", "--encoding"])?,
+            show_line_numbers: args.contains(["-n", "--number"]),
+            debug: args.contains("--debug"),
+
+            // 語法高亮選項
+            no_highlight: args.contains("--no-highlight"),
+            theme: args.opt_value_from_str("--theme")?,
+
+            files: args.finish().into_iter().map(PathBuf::from).collect(),
         })
-    }
-
-    fn print_version() {
-        println!("cate {}", env!("CARGO_PKG_VERSION"));
-    }
-
-    fn print_help() {
-        println!("cate - Display file contents with encoding support");
-        println!();
-        println!("USAGE:");
-        println!("    cate [OPTIONS] [FILE]");
-        println!();
-        println!("ARGUMENTS:");
-        println!("    [FILE]                  File to display (omit to read from stdin)");
-        println!();
-        println!("OPTIONS:");
-        println!("    -h, --help              Show this help message");
-        println!("    -v, --version           Show version information");
-        println!("    -e, --encoding <ENC>    Specify encoding");
-        println!("                            (utf-8, gbk, big5, shift-jis, etc.)");
-        println!("    -n, --number            Show line numbers");
-        println!("    --debug                 Enable debug mode");
-        println!("    --list-encodings        List all supported encodings");
-        println!();
-        println!("ENCODING DETECTION:");
-        println!("    Priority: UTF-8/BOM > User specified (-e) > System encoding");
-        println!();
-        println!("EXAMPLES:");
-        println!("    cate file.txt                    # Display file with auto-detected encoding");
-        println!("    cate file.txt -e gbk             # Display file using GBK encoding");
-        println!("    cate file.txt -n                 # Display with line numbers");
-        println!("    cate file.txt -e big5 -n         # Combine options");
-        println!("    echo \"text\" | cate -e utf-8       # Read from stdin");
-        println!("    cate --list-encodings            # Show supported encodings");
     }
 }
 
@@ -101,33 +75,124 @@ fn main() -> Result<()> {
         None
     };
 
-    // 讀取內容（從文件或 stdin）
-    let (content, detected) = if let Some(ref file_path) = args.file {
-        if args.debug {
-            eprintln!("[DEBUG] Reading file: {:?}", file_path);
-        }
-        encoder::read_file_with_encoding(file_path, user_encoding, args.debug)?
-    } else {
+    // 處理 stdin
+    if args.files.is_empty() {
         if args.debug {
             eprintln!("[DEBUG] Reading from stdin");
         }
-        encoder::read_stdin_with_encoding(user_encoding, args.debug)?
-    };
+        let (content, detected) = encoder::read_stdin_with_encoding(user_encoding, args.debug)?;
 
-    // Debug 信息
-    if args.debug {
-        eprintln!(
-            "[DEBUG] Final encoding: {} (confidence: {:?})",
-            detected.encoding.name(),
-            detected.confidence
-        );
-        eprintln!("[DEBUG] Content length: {} bytes", content.len());
-        eprintln!("[DEBUG] Line count: {}", content.lines().count());
-        eprintln!("[DEBUG] ---");
+        if args.debug {
+            eprintln!(
+                "[DEBUG] Final encoding: {} (confidence: {:?})",
+                detected.encoding.name(),
+                detected.confidence
+            );
+            eprintln!("[DEBUG] Content length: {} bytes", content.len());
+            eprintln!("[DEBUG] ---");
+        }
+
+        printer::print_content(
+            &content,
+            args.show_line_numbers,
+            None,
+            !args.no_highlight,
+            args.theme.as_deref(),
+        )?;
+
+        return Ok(());
     }
 
-    // 打印內容
-    printer::print_content(&content, args.show_line_numbers);
+    // 處理檔案
+    for (i, file_path) in args.files.iter().enumerate() {
+        if args.debug {
+            eprintln!("[DEBUG] Reading file: {:?}", file_path);
+        }
+
+        let (content, detected) =
+            encoder::read_file_with_encoding(file_path, user_encoding, args.debug)?;
+
+        if args.debug {
+            eprintln!(
+                "[DEBUG] Final encoding: {} (confidence: {:?})",
+                detected.encoding.name(),
+                detected.confidence
+            );
+            eprintln!("[DEBUG] Content length: {} bytes", content.len());
+            eprintln!("[DEBUG] ---");
+        }
+
+        printer::print_content(
+            &content,
+            args.show_line_numbers,
+            Some(file_path.as_path()),
+            !args.no_highlight,
+            args.theme.as_deref(),
+        )?;
+
+        // 多個檔案間加分隔
+        if i < args.files.len() - 1 {
+            // 使用 println! 來檢查並忽略 broken pipe
+            if let Err(e) = writeln!(std::io::stdout()) {
+                if e.kind() == std::io::ErrorKind::BrokenPipe {
+                    break; // 提早退出迴圈
+                }
+                return Err(e.into());
+            }
+        }
+    }
 
     Ok(())
+}
+fn print_help() {
+    println!("cate - cat with encoding support and syntax highlighting");
+    println!();
+    println!("USAGE:");
+    println!("    cate [OPTIONS] [FILES]...");
+    println!();
+    println!("OPTIONS:");
+    println!("    -h, --help              Print this help message");
+    println!("    -v, --version           Print version information");
+    println!("    -e, --encoding <ENC>    Specify input encoding (utf-8, gbk, big5, etc.)");
+    println!("    -n, --number            Show line numbers");
+    println!("    --debug                 Show debug information");
+    println!("    --list-encodings        List all supported encodings");
+    println!();
+    println!("SYNTAX HIGHLIGHTING:");
+    println!("    --no-highlight          Disable syntax highlighting");
+    println!("    --theme <THEME>         Set color theme (default: InspiredGitHub)");
+    println!("    --list-themes           List all available themes");
+    println!("    --list-syntaxes         List all supported languages");
+    println!();
+    println!("EXAMPLES:");
+    println!("    cate file.rs                    # Display Rust file with syntax highlighting");
+    println!("    cate --theme 'Solarized (dark)' file.py");
+    println!("    cate -n --no-highlight file.txt # Show line numbers without highlighting");
+    println!("    cate -e gbk chinese.txt         # Specify GBK encoding");
+    println!("    cat file.js | cate              # Read from stdin");
+    println!();
+    println!("SUPPORTED ENCODINGS:");
+    encoder::list_encodings();
+}
+
+fn print_version() {
+    println!("cate {}", env!("CARGO_PKG_VERSION"));
+}
+
+fn list_themes() {
+    println!("Available themes:");
+    let mut themes = highlighter::Highlighter::available_themes();
+    themes.sort();
+    for theme in themes {
+        println!("  {}", theme);
+    }
+}
+
+fn list_syntaxes() {
+    // 像 bat 一樣顯示所有語法
+    let syntaxes = highlighter::Highlighter::available_syntaxes();
+
+    for syntax in syntaxes {
+        println!("{}", syntax);
+    }
 }

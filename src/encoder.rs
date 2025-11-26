@@ -13,9 +13,9 @@ pub struct DetectedEncoding {
 
 #[derive(Debug, PartialEq)]
 pub enum EncodingConfidence {
-    Certain,  // BOM 或用戶指定
-    High,     // UTF-8 檢測成功
-    Low,      // 回退到系統編碼
+    Certain, // BOM 或用戶指定
+    High,    // UTF-8 檢測成功
+    Low,     // 回退到系統編碼
 }
 
 /// 讀取文件內容並轉換為 UTF-8 字符串
@@ -54,9 +54,16 @@ pub fn read_stdin_with_encoding(
     debug: bool,
 ) -> Result<(String, DetectedEncoding)> {
     let mut bytes = Vec::new();
-    std::io::stdin()
-        .read_to_end(&mut bytes)
-        .context("Failed to read from stdin")?;
+
+    // 讀取 stdin，處理 Ctrl+C 中斷
+    match std::io::stdin().read_to_end(&mut bytes) {
+        Ok(_) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {
+            // Ctrl+C 被按下，正常退出
+            std::process::exit(0);
+        }
+        Err(e) => return Err(e).context("Failed to read from stdin"),
+    }
 
     let detected = detect_encoding(&bytes, user_encoding, debug);
 
@@ -119,7 +126,10 @@ fn detect_encoding(
     // 4. 回退到系統編碼
     let system_encoding = get_system_encoding();
     if debug {
-        eprintln!("[DEBUG] Falling back to system encoding: {}", system_encoding.name());
+        eprintln!(
+            "[DEBUG] Falling back to system encoding: {}",
+            system_encoding.name()
+        );
     }
     DetectedEncoding {
         encoding: system_encoding,
@@ -135,7 +145,7 @@ fn get_system_encoding() -> &'static Encoding {
     let code_page = unsafe { GetACP() };
 
     match code_page {
-        936 => encoding_rs::GBK,           // 簡體中文
+        936 => encoding_rs::GBK, // 簡體中文
         950 => {
             // 繁體中文 Big5
             Encoding::for_label(b"big5").unwrap_or(encoding_rs::UTF_8)
@@ -169,10 +179,8 @@ pub fn parse_encoding(enc_str: &str) -> Result<&'static Encoding> {
         "utf-16be" | "utf16be" => Ok(encoding_rs::UTF_16BE),
         "gbk" | "cp936" => Ok(encoding_rs::GBK),
         "shift-jis" | "shift_jis" | "sjis" => Ok(encoding_rs::SHIFT_JIS),
-        "big5" | "cp950" => {
-            Encoding::for_label(b"big5")
-                .ok_or_else(|| anyhow::anyhow!("Big5 encoding not supported"))
-        }
+        "big5" | "cp950" => Encoding::for_label(b"big5")
+            .ok_or_else(|| anyhow::anyhow!("Big5 encoding not supported")),
         "cp1252" | "windows-1252" => Ok(encoding_rs::WINDOWS_1252),
         "iso-8859-1" | "latin1" => Ok(encoding_rs::WINDOWS_1252), // 類似
         _ => {

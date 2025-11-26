@@ -1,13 +1,15 @@
 # cate
 
-A lightweight CLI tool to display file contents with encoding support - like `cat` with better encoding handling.
+A lightweight CLI tool to display file contents with encoding support and syntax highlighting - like `cat` but better.
 
 ## Features
 
+- 🎨 **Syntax Highlighting**: Automatic syntax highlighting for 219 languages
 - 🌍 **Multi-encoding Support**: UTF-8, GBK, Big5, Shift-JIS, and more
-- 🔍 **Smart Encoding Detection**: Auto-detects UTF-8/BOM, falls back gracefully
+- 🔍 **Smart Detection**: Auto-detects file type and encoding
+- 🎭 **Multiple Themes**: 7 built-in color themes
 - 📝 **Line Numbers**: Optional line number display
-- 🚀 **Lightweight**: Optimized for minimal binary size
+- 🚀 **Lightweight**: Only 2.1 MB binary size
 - 🔧 **Debug Mode**: Detailed encoding detection information
 - 📋 **Stdin Support**: Read from pipes and redirects
 
@@ -84,26 +86,38 @@ For manual installations, simply remove the binary from your system.
 ## Usage
 
 ```bash
-# Display file with auto-detected encoding
-cate file.txt
+# Display file with syntax highlighting (default)
+cate file.rs
+
+# Display multiple files
+cate file1.rs file2.py file3.js
+
+# Show line numbers with highlighting
+cate file.rs -n
 
 # Specify encoding
 cate file.txt -e gbk
 
-# Show line numbers
-cate file.txt -n
+# Use different theme
+cate file.py --theme "Solarized (dark)"
 
-# Combine options
-cate file.txt -e big5 -n
+# Disable syntax highlighting
+cate file.txt --no-highlight
 
-# Read from stdin
-echo "Hello World" | cate
+# Read from stdin with highlighting
+echo 'fn main() { println!("Hello"); }' | cate
+
+# List available themes
+cate --list-themes
+
+# List supported languages
+cate --list-syntaxes
+
+# List supported encodings
+cate --list-encodings
 
 # Debug mode (show encoding detection info)
 cate file.txt --debug
-
-# List all supported encodings
-cate --list-encodings
 ```
 
 ## Options
@@ -115,6 +129,12 @@ cate --list-encodings
 -n, --number            Show line numbers
 --debug                 Enable debug mode
 --list-encodings        List all supported encodings
+
+Syntax Highlighting:
+--no-highlight          Disable syntax highlighting
+--theme <THEME>         Set color theme (default: base16-ocean.dark)
+--list-themes           List all available themes
+--list-syntaxes         List all supported languages
 ```
 
 ## Encoding Detection
@@ -143,42 +163,75 @@ The tool uses the following priority for encoding detection:
 ### Others
 Any encoding supported by the `encoding_rs` crate (e.g., EUC-JP, ISO-8859-2, KOI8-R, etc.)
 
+## Supported Languages
+
+Syntax highlighting is supported for 219 languages including:
+
+### Programming Languages
+- Rust, Python, JavaScript, TypeScript
+- Go, C, C++, Java, C#
+
+### Scripting
+- Bash, PowerShell, Batch File
+- Makefile, Dockerfile
+
+### Data & Markup
+- JSON, YAML, TOML, XML
+- HTML, CSS, Markdown
+
+### Themes
+- base16-ocean.dark (default)
+- Solarized (dark/light)
+- InspiredGitHub
+- base16-eighties.dark
+- base16-mocha.dark
+- And more...
+
 ## Examples
 
-### Display GBK-encoded file
+### Syntax Highlighting
+
 ```bash
+# Display Rust file with syntax highlighting
+cate src/main.rs
+
+# Use a different theme
+cate app.py --theme "Solarized (dark)"
+
+# Show line numbers with highlighting
+cate config.toml -n
+
+# Display multiple source files
+cate src/*.rs
+```
+
+### Encoding Support
+
+```bash
+# Display GBK-encoded file
 cate chinese_file.txt -e gbk
-```
 
-### Show Big5 file with line numbers
-```bash
+# Show Big5 file with line numbers
 cate traditional_chinese.txt -e big5 -n
+
+# Combine encoding and highlighting
+cate source_code.py -e gbk -n
 ```
 
-### Debug encoding detection
+### Advanced Usage
+
 ```bash
+# Debug encoding detection
 cate mystery_file.txt --debug
-```
 
-Output:
-```
-[DEBUG] Reading file: "mystery_file.txt"
-[DEBUG] Valid UTF-8 detected
-[DEBUG] Detected encoding: UTF-8 (confidence: High)
-[DEBUG] Final encoding: UTF-8 (confidence: High)
-[DEBUG] Content length: 1234 bytes
-[DEBUG] Line count: 42
-[DEBUG] ---
-... file content ...
-```
+# Use with pipes
+echo 'fn main() { println!("Test"); }' | cate
 
-### Use with pipes
-```bash
-# Convert encoding and display
-iconv -f gbk -t utf-8 input.txt | cate
+# Convert encoding and display with highlighting
+iconv -f gbk -t utf-8 input.py | cate
 
-# Display with line numbers
-cat file.txt | cate -n
+# Disable highlighting for plain text
+cate log.txt --no-highlight
 ```
 
 ## Building
@@ -214,14 +267,29 @@ cargo test -- --nocapture
 The name "cate" combines "cat" (the Unix command) with "encoding", making it easy to remember and type.
 
 ### Advantages over regular `cat`:
+- ✅ **Syntax highlighting** for 219 programming languages
+- ✅ **7 beautiful themes** with true color support
 - ✅ Automatic encoding detection and conversion
 - ✅ Support for non-UTF-8 files (GBK, Big5, Shift-JIS, etc.)
 - ✅ Debug mode for troubleshooting encoding issues
 - ✅ Built-in line numbering
+- ✅ Only 2.1 MB binary size
 
 ## License
 
 MIT License - see LICENSE file for details
+
+## Third-Party Resources
+
+This project uses syntax definitions from the [bat](https://github.com/sharkdp/bat) project, which are licensed under MIT License / Apache License 2.0. The syntax definitions are originally derived from Sublime Text packages (MIT License).
+
+For complete third-party license information, see [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).
+
+### Acknowledgements
+
+- **bat project** - For the excellent syntax definition collection
+- **Sublime Text community** - For maintaining the original syntax definitions
+- **syntect** - For the syntax highlighting engine
 
 ## Author
 
