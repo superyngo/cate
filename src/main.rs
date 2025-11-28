@@ -4,7 +4,7 @@ mod printer;
 
 use anyhow::Result;
 use pico_args::Arguments;
-use std::io::{IsTerminal, Write};
+use std::io::Write;
 use std::path::PathBuf;
 
 /// 顏色輸出模式
@@ -28,13 +28,52 @@ impl ColorMode {
         }
     }
 
-    /// 根據模式和 TTY 狀態決定是否啟用顏色
+    /// 根據模式和輸出目標決定是否啟用顏色
+    /// auto 模式：終端和管道有顏色，文件重定向無顏色
     fn should_colorize(&self) -> bool {
         match self {
-            ColorMode::Auto => std::io::stdout().is_terminal(),
+            ColorMode::Auto => !is_redirected_to_file(),
             ColorMode::Always => true,
             ColorMode::Never => false,
         }
+    }
+}
+
+/// 檢測 stdout 是否重定向到普通文件
+/// 返回 true 表示重定向到文件（應該禁用顏色）
+/// 返回 false 表示終端或管道（應該啟用顏色）
+fn is_redirected_to_file() -> bool {
+    use std::io::IsTerminal;
+
+    // 如果是終端，肯定不是文件重定向
+    if std::io::stdout().is_terminal() {
+        return false;
+    }
+
+    // 不是終端，需要進一步檢查是管道還是文件
+    // 在 Unix 系統上，可以用 fstat 檢查
+    #[cfg(unix)]
+    {
+        use std::os::unix::io::AsRawFd;
+        let fd = std::io::stdout().as_raw_fd();
+
+        unsafe {
+            let mut stat: libc::stat = std::mem::zeroed();
+            if libc::fstat(fd, &mut stat) == 0 {
+                // S_ISREG: 普通文件
+                // S_ISFIFO: 管道（FIFO）
+                // S_ISCHR: 字符設備（終端）
+                return (stat.st_mode & libc::S_IFMT) == libc::S_IFREG;
+            }
+        }
+        // Unix 檢查失敗，保守處理
+        return false;
+    }
+
+    // Windows：不是 TTY 就禁用顏色（無法區分管道和文件）
+    #[cfg(not(unix))]
+    {
+        true
     }
 }
 

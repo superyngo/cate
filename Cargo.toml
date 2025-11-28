@@ -1,6 +1,6 @@
 [package]
 name = "cate"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 authors = ["wen"]
 description = "A lightweight CLI tool to display file contents with encoding support and syntax highlighting"
@@ -21,6 +21,9 @@ ansi_colours = "1.2"   # RGB 到 ANSI 256 色轉換（與 bat 相同）
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winnls"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"  # 用於 fstat 檢測文件類型
 
 [features]
 default = ["syntax-highlighting"]

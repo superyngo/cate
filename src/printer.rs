@@ -74,7 +74,7 @@ fn print_single_line(
         .unwrap_or_else(|_| line.to_string());
 
     if show_line_numbers {
-        match write!(stdout, "{:>6} {}", line_number, highlighted) {
+        match write!(stdout, "{} {}", line_number, highlighted) {
             Ok(_) => Ok(()),
             Err(e) if e.kind() == io::ErrorKind::BrokenPipe => Ok(()),
             Err(e) => Err(e),
@@ -93,7 +93,7 @@ fn print_plain_line(line: &str, line_number: usize, show_line_numbers: bool) -> 
     let mut stdout = io::stdout().lock();
 
     if show_line_numbers {
-        match writeln!(stdout, "{:>6} {}", line_number, line.trim_end()) {
+        match writeln!(stdout, "{} {}", line_number, line.trim_end()) {
             Ok(_) => Ok(()),
             Err(e) if e.kind() == io::ErrorKind::BrokenPipe => Ok(()),
             Err(e) => Err(e),

@@ -120,7 +120,36 @@ impl Highlighter {
                 }
 
                 // 特殊檔名處理
-                match name.to_lowercase().as_str() {
+                let name_lower = name.to_lowercase();
+
+                // Shell 配置文件
+                if matches!(
+                    name_lower.as_str(),
+                    ".bashrc"
+                        | ".bash_profile"
+                        | ".bash_login"
+                        | ".bash_logout"
+                        | ".zshrc"
+                        | ".zprofile"
+                        | ".zshenv"
+                        | ".zlogin"
+                        | ".zlogout"
+                        | ".profile"
+                        | "bashrc"
+                        | "bash_profile"
+                ) {
+                    // 嘗試找 Bash 或 Shell Script 語法
+                    if let Some(syntax) = SYNTAX_SET
+                        .find_syntax_by_name("Bash")
+                        .or_else(|| SYNTAX_SET.find_syntax_by_name("Shell Script (Bash)"))
+                        .or_else(|| SYNTAX_SET.find_syntax_by_extension("sh"))
+                    {
+                        return syntax;
+                    }
+                }
+
+                // 其他特殊檔名
+                match name_lower.as_str() {
                     "makefile" | "gnumakefile" => {
                         if let Some(syntax) = SYNTAX_SET.find_syntax_by_name("Makefile") {
                             return syntax;
