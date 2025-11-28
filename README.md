@@ -11,6 +11,7 @@ A lightweight CLI tool to display file contents with encoding support and syntax
 - 📝 **Line Numbers**: Optional line number display
 - 🚀 **Lightweight & Fast**: Only 2.1 MB binary size with streaming architecture
 - ⚡ **High Performance**: Instant output for large files with line-by-line processing
+- 🎨 **Smart Color Output**: Auto-detects TTY to avoid polluting redirected files
 - 🔧 **Debug Mode**: Detailed encoding detection information
 - 📋 **Stdin Support**: Read from pipes and redirects with language specification
 - 🎯 **Manual Language Selection**: Override auto-detection with `-l/--language` flag
@@ -140,6 +141,7 @@ Syntax Highlighting:
 --no-highlight          Disable syntax highlighting
 --theme <THEME>         Set color theme (default: base16-eighties.dark)
 -l, --language <LANG>   Specify syntax language (e.g., rust, python, js)
+--color <WHEN>          When to use colors: auto, always, never (default: auto)
 --list-themes           List all available themes
 --list-syntaxes         List all supported languages
 ```
@@ -243,6 +245,12 @@ cat script | cate -l js      # JavaScript by extension
 # Override file extension detection
 cate config.txt -l yaml      # Treat .txt as YAML
 
+# Color output control
+cate file.rs > output.txt              # Auto-disables colors when redirected
+cate file.rs --color always > out.txt  # Force colors in output
+cate file.rs --color always | less -R  # Use with color-aware pager
+cate file.rs --color never             # Disable colors completely
+
 # Convert encoding and display with highlighting
 iconv -f gbk -t utf-8 input.py | cate -l python
 
@@ -287,11 +295,15 @@ cargo test -- --nocapture
 - 💾 **Low memory usage**: Only buffers single lines, not entire files
 - 🎯 **Stateful highlighting**: Correctly handles multi-line syntax (comments, strings, etc.)
 - 🛡️ **Long line protection**: Automatically skips highlighting for lines >16KB
+- 🎨 **Smart TTY detection**: Auto-disables colors when output is redirected
 
 ### Performance Example
 ```bash
 # 10,000 line file processes in ~0.3 seconds with instant first-line output
 cate large_file.rs
+
+# Redirecting to file automatically disables color codes (no pollution)
+cate large_file.rs > output.txt
 ```
 
 ## Why cate?
@@ -302,6 +314,7 @@ The name "cate" combines "cat" (the Unix command) with "encoding", making it eas
 - ✅ **Syntax highlighting** for 219 programming languages
 - ✅ **7 beautiful themes** with true color support
 - ✅ **Streaming architecture** for instant output on large files
+- ✅ **Smart color handling** - auto-disables when redirected to files
 - ✅ Automatic encoding detection and conversion
 - ✅ Support for non-UTF-8 files (GBK, Big5, Shift-JIS, etc.)
 - ✅ Manual language selection with `-l` flag

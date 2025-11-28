@@ -4,8 +4,39 @@ mod printer;
 
 use anyhow::Result;
 use pico_args::Arguments;
-use std::io::Write;
+use std::io::{IsTerminal, Write};
 use std::path::PathBuf;
+
+/// 顏色輸出模式
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ColorMode {
+    Auto,   // 自動檢測（TTY 時啟用）
+    Always, // 總是輸出顏色
+    Never,  // 永不輸出顏色
+}
+
+impl ColorMode {
+    fn from_str(s: &str) -> Result<Self> {
+        match s.to_lowercase().as_str() {
+            "auto" => Ok(ColorMode::Auto),
+            "always" => Ok(ColorMode::Always),
+            "never" => Ok(ColorMode::Never),
+            _ => Err(anyhow::anyhow!(
+                "Invalid color mode: '{}'. Use 'auto', 'always', or 'never'",
+                s
+            )),
+        }
+    }
+
+    /// 根據模式和 TTY 狀態決定是否啟用顏色
+    fn should_colorize(&self) -> bool {
+        match self {
+            ColorMode::Auto => std::io::stdout().is_terminal(),
+            ColorMode::Always => true,
+            ColorMode::Never => false,
+        }
+    }
+}
 
 struct Args {
     files: Vec<PathBuf>,
@@ -17,6 +48,7 @@ struct Args {
     no_highlight: bool,       // --no-highlight: 停用語法高亮
     theme: Option<String>,    // --theme: 指定主題
     language: Option<String>, // -l, --language: 指定語法語言
+    color_mode: ColorMode,    // --color: 顏色輸出模式
 }
 
 impl Args {
@@ -52,6 +84,13 @@ impl Args {
             std::process::exit(0);
         }
 
+        // 解析 color mode
+        let color_mode = if let Some(color_str) = args.opt_value_from_str::<_, String>("--color")? {
+            ColorMode::from_str(&color_str)?
+        } else {
+            ColorMode::Auto // 默認為 auto
+        };
+
         Ok(Args {
             encoding: args.opt_value_from_str(["-e", "--encoding"])?,
             show_line_numbers: args.contains(["-n", "--number"]),
@@ -61,6 +100,7 @@ impl Args {
             no_highlight: args.contains("--no-highlight"),
             theme: args.opt_value_from_str("--theme")?,
             language: args.opt_value_from_str(["-l", "--language"])?,
+            color_mode,
 
             files: args.finish().into_iter().map(PathBuf::from).collect(),
         })
@@ -94,13 +134,16 @@ fn main() -> Result<()> {
             eprintln!("[DEBUG] ---");
         }
 
+        // 決定是否啟用語法高亮（考慮 --no-highlight 和 TTY 檢測）
+        let enable_highlighting = !args.no_highlight && args.color_mode.should_colorize();
+
         // 使用 Cursor 將字符串轉為 BufRead
         let reader = std::io::Cursor::new(content);
         printer::print_content_streaming(
             reader,
             args.show_line_numbers,
             None,
-            !args.no_highlight,
+            enable_highlighting,
             args.theme.as_deref(),
             args.language.as_deref(),
         )?;
@@ -127,13 +170,16 @@ fn main() -> Result<()> {
             eprintln!("[DEBUG] ---");
         }
 
+        // 決定是否啟用語法高亮（考慮 --no-highlight 和 TTY 檢測）
+        let enable_highlighting = !args.no_highlight && args.color_mode.should_colorize();
+
         // 使用 Cursor 將字符串轉為 BufRead
         let reader = std::io::Cursor::new(content);
         printer::print_content_streaming(
             reader,
             args.show_line_numbers,
             Some(file_path.as_path()),
-            !args.no_highlight,
+            enable_highlighting,
             args.theme.as_deref(),
             args.language.as_deref(),
         )?;
@@ -170,6 +216,7 @@ fn print_help() {
     println!("    --no-highlight          Disable syntax highlighting");
     println!("    --theme <THEME>         Set color theme (default: base16-eighties.dark)");
     println!("    -l, --language <LANG>   Specify syntax language (e.g., rust, python)");
+    println!("    --color <WHEN>          When to use colors: auto, always, never (default: auto)");
     println!("    --list-themes           List all available themes");
     println!("    --list-syntaxes         List all supported languages");
     println!();
@@ -180,6 +227,8 @@ fn print_help() {
     println!("    cate -e gbk chinese.txt         # Specify GBK encoding");
     println!("    cat file.js | cate              # Read from stdin");
     println!("    cat script | cate -l python     # Specify language for stdin");
+    println!("    cate file.rs > output.txt       # Auto-disable colors when redirected");
+    println!("    cate file.rs --color=always | less -R  # Force colors for pager");
     println!();
     println!("SUPPORTED ENCODINGS:");
     encoder::list_encodings();
