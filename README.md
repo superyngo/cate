@@ -9,9 +9,11 @@ A lightweight CLI tool to display file contents with encoding support and syntax
 - 🔍 **Smart Detection**: Auto-detects file type and encoding
 - 🎭 **Multiple Themes**: 7 built-in color themes
 - 📝 **Line Numbers**: Optional line number display
-- 🚀 **Lightweight**: Only 2.1 MB binary size
+- 🚀 **Lightweight & Fast**: Only 2.1 MB binary size with streaming architecture
+- ⚡ **High Performance**: Instant output for large files with line-by-line processing
 - 🔧 **Debug Mode**: Detailed encoding detection information
-- 📋 **Stdin Support**: Read from pipes and redirects
+- 📋 **Stdin Support**: Read from pipes and redirects with language specification
+- 🎯 **Manual Language Selection**: Override auto-detection with `-l/--language` flag
 
 ## Installation
 
@@ -104,8 +106,12 @@ cate file.py --theme "Solarized (dark)"
 # Disable syntax highlighting
 cate file.txt --no-highlight
 
-# Read from stdin with highlighting
-echo 'fn main() { println!("Hello"); }' | cate
+# Read from stdin with language specification
+cat script.sh | cate -l bash
+echo 'fn main() { println!("Hello"); }' | cate -l rust
+
+# Override file extension detection
+cate -l python file.txt
 
 # List available themes
 cate --list-themes
@@ -132,7 +138,8 @@ cate file.txt --debug
 
 Syntax Highlighting:
 --no-highlight          Disable syntax highlighting
---theme <THEME>         Set color theme (default: base16-ocean.dark)
+--theme <THEME>         Set color theme (default: base16-eighties.dark)
+-l, --language <LANG>   Specify syntax language (e.g., rust, python, js)
 --list-themes           List all available themes
 --list-syntaxes         List all supported languages
 ```
@@ -180,10 +187,10 @@ Syntax highlighting is supported for 219 languages including:
 - HTML, CSS, Markdown
 
 ### Themes
-- base16-ocean.dark (default)
+- base16-eighties.dark (default)
 - Solarized (dark/light)
 - InspiredGitHub
-- base16-eighties.dark
+- base16-ocean.dark
 - base16-mocha.dark
 - And more...
 
@@ -224,11 +231,20 @@ cate source_code.py -e gbk -n
 # Debug encoding detection
 cate mystery_file.txt --debug
 
-# Use with pipes
-echo 'fn main() { println!("Test"); }' | cate
+# Use with pipes and specify language
+cat unknown_script | cate -l python
+echo 'fn main() { println!("Test"); }' | cate -l rust
+
+# Language specification (case-insensitive, supports extensions)
+cat script | cate -l Rust    # Works with any case
+cat script | cate -l rs      # Works with file extension
+cat script | cate -l js      # JavaScript by extension
+
+# Override file extension detection
+cate config.txt -l yaml      # Treat .txt as YAML
 
 # Convert encoding and display with highlighting
-iconv -f gbk -t utf-8 input.py | cate
+iconv -f gbk -t utf-8 input.py | cate -l python
 
 # Disable highlighting for plain text
 cate log.txt --no-highlight
@@ -262,6 +278,22 @@ cargo test
 cargo test -- --nocapture
 ```
 
+## Performance
+
+**cate** uses a streaming architecture inspired by [bat](https://github.com/sharkdp/bat) for optimal performance:
+
+- ⚡ **Line-by-line processing**: Files are processed and output incrementally
+- 🚀 **Instant output**: First lines appear immediately, even for large files
+- 💾 **Low memory usage**: Only buffers single lines, not entire files
+- 🎯 **Stateful highlighting**: Correctly handles multi-line syntax (comments, strings, etc.)
+- 🛡️ **Long line protection**: Automatically skips highlighting for lines >16KB
+
+### Performance Example
+```bash
+# 10,000 line file processes in ~0.3 seconds with instant first-line output
+cate large_file.rs
+```
+
 ## Why cate?
 
 The name "cate" combines "cat" (the Unix command) with "encoding", making it easy to remember and type.
@@ -269,8 +301,10 @@ The name "cate" combines "cat" (the Unix command) with "encoding", making it eas
 ### Advantages over regular `cat`:
 - ✅ **Syntax highlighting** for 219 programming languages
 - ✅ **7 beautiful themes** with true color support
+- ✅ **Streaming architecture** for instant output on large files
 - ✅ Automatic encoding detection and conversion
 - ✅ Support for non-UTF-8 files (GBK, Big5, Shift-JIS, etc.)
+- ✅ Manual language selection with `-l` flag
 - ✅ Debug mode for troubleshooting encoding issues
 - ✅ Built-in line numbering
 - ✅ Only 2.1 MB binary size

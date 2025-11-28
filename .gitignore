@@ -16,3 +16,6 @@ Thumbs.db
 # Test files
 test.txt
 *.tmp
+
+# claude
+.claude/

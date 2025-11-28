@@ -14,8 +14,9 @@ struct Args {
     debug: bool,
 
     // 語法高亮選項
-    no_highlight: bool,    // --no-highlight: 停用語法高亮
-    theme: Option<String>, // --theme: 指定主題
+    no_highlight: bool,       // --no-highlight: 停用語法高亮
+    theme: Option<String>,    // --theme: 指定主題
+    language: Option<String>, // -l, --language: 指定語法語言
 }
 
 impl Args {
@@ -59,6 +60,7 @@ impl Args {
             // 語法高亮選項
             no_highlight: args.contains("--no-highlight"),
             theme: args.opt_value_from_str("--theme")?,
+            language: args.opt_value_from_str(["-l", "--language"])?,
 
             files: args.finish().into_iter().map(PathBuf::from).collect(),
         })
@@ -92,12 +94,15 @@ fn main() -> Result<()> {
             eprintln!("[DEBUG] ---");
         }
 
-        printer::print_content(
-            &content,
+        // 使用 Cursor 將字符串轉為 BufRead
+        let reader = std::io::Cursor::new(content);
+        printer::print_content_streaming(
+            reader,
             args.show_line_numbers,
             None,
             !args.no_highlight,
             args.theme.as_deref(),
+            args.language.as_deref(),
         )?;
 
         return Ok(());
@@ -122,12 +127,15 @@ fn main() -> Result<()> {
             eprintln!("[DEBUG] ---");
         }
 
-        printer::print_content(
-            &content,
+        // 使用 Cursor 將字符串轉為 BufRead
+        let reader = std::io::Cursor::new(content);
+        printer::print_content_streaming(
+            reader,
             args.show_line_numbers,
             Some(file_path.as_path()),
             !args.no_highlight,
             args.theme.as_deref(),
+            args.language.as_deref(),
         )?;
 
         // 多個檔案間加分隔
@@ -160,7 +168,8 @@ fn print_help() {
     println!();
     println!("SYNTAX HIGHLIGHTING:");
     println!("    --no-highlight          Disable syntax highlighting");
-    println!("    --theme <THEME>         Set color theme (default: InspiredGitHub)");
+    println!("    --theme <THEME>         Set color theme (default: base16-eighties.dark)");
+    println!("    -l, --language <LANG>   Specify syntax language (e.g., rust, python)");
     println!("    --list-themes           List all available themes");
     println!("    --list-syntaxes         List all supported languages");
     println!();
@@ -170,6 +179,7 @@ fn print_help() {
     println!("    cate -n --no-highlight file.txt # Show line numbers without highlighting");
     println!("    cate -e gbk chinese.txt         # Specify GBK encoding");
     println!("    cat file.js | cate              # Read from stdin");
+    println!("    cat script | cate -l python     # Specify language for stdin");
     println!();
     println!("SUPPORTED ENCODINGS:");
     encoder::list_encodings();

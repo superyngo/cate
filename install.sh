@@ -47,6 +47,12 @@ detect_platform() {
         aarch64|arm64)
             ARCH="aarch64"
             ;;
+        armv7l)
+            ARCH="armv7"
+            ;;
+        i686|i386)
+            ARCH="i686"
+            ;;
         *)
             print_error "Unsupported architecture: $arch"
             exit 1

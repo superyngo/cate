@@ -39,7 +39,7 @@ where
     }
 }
 
-/// 語法高亮器
+/// 語法高亮器（用於創建 LineHighlighter）
 pub struct Highlighter {
     theme: Theme,
     true_color: bool,
@@ -48,7 +48,7 @@ pub struct Highlighter {
 impl Highlighter {
     /// 建立新的高亮器
     pub fn new(theme_name: Option<&str>, true_color: bool) -> Result<Self> {
-        let theme_name = theme_name.unwrap_or("InspiredGitHub");
+        let theme_name = theme_name.unwrap_or("base16-eighties.dark");
         let theme = THEME_SET
             .themes
             .get(theme_name)
@@ -58,41 +58,52 @@ impl Highlighter {
         Ok(Self { theme, true_color })
     }
 
-    /// 對整個檔案內容進行高亮
-    pub fn highlight(&self, content: &str, file_path: Option<&Path>) -> Result<String> {
-        // 檢測語法
-        let syntax = self.detect_syntax(content, file_path);
+    /// 準備一個逐行高亮器
+    pub fn prepare_for_file<'a>(
+        &'a self,
+        file_path: Option<&Path>,
+        first_line: Option<&str>,
+        language: Option<&str>,
+    ) -> LineHighlighter<'a> {
+        // 檢測語法（優先使用手動指定的語言）
+        let syntax = if let Some(lang) = language {
+            self.find_syntax_by_name(lang)
+                .unwrap_or_else(|| self.detect_syntax(first_line, file_path))
+        } else {
+            self.detect_syntax(first_line, file_path)
+        };
+        let is_plain_text = syntax.name == "Plain Text";
 
-        // 如果是純文字，直接返回
-        if syntax.name == "Plain Text" {
-            return Ok(content.to_string());
+        LineHighlighter {
+            highlighter: HighlightLines::new(syntax, &self.theme),
+            true_color: self.true_color,
+            is_plain_text,
+        }
+    }
+
+    /// 根據語言名稱查找語法
+    fn find_syntax_by_name(&self, name: &str) -> Option<&SyntaxReference> {
+        // 嘗試精確匹配
+        if let Some(syntax) = SYNTAX_SET.find_syntax_by_name(name) {
+            return Some(syntax);
         }
 
-        // 逐行高亮（保留換行符，與 bat 一致）
-        let mut highlighter = HighlightLines::new(syntax, &self.theme);
-        let mut output = String::with_capacity(content.len() + content.len() / 4);
-
-        // 使用 split_inclusive 保留換行符，這對 syntect 的狀態機很重要
-        for line in content.split_inclusive('\n') {
-            let ranges: Vec<(Style, &str)> = highlighter
-                .highlight_line(line, &SYNTAX_SET)
-                .context("Failed to highlight line")?;
-
-            let escaped = if self.true_color {
-                as_24_bit_terminal_escaped(&ranges[..], false)
-            } else {
-                self.as_8bit_terminal_escaped(&ranges[..])
-            };
-
-            output.push_str(&escaped);
-            // 不需要額外添加換行符，因為 line 已經包含了（除了最後一行可能沒有）
-        }
-
-        Ok(output)
+        // 嘗試模糊匹配（不區分大小寫）
+        let name_lower = name.to_lowercase();
+        SYNTAX_SET.syntaxes().iter().find(|s| {
+            s.name.to_lowercase() == name_lower
+                || s.file_extensions
+                    .iter()
+                    .any(|ext| ext.to_lowercase() == name_lower)
+        })
     }
 
     /// 檢測檔案的語法類型
-    fn detect_syntax(&self, content: &str, file_path: Option<&Path>) -> &SyntaxReference {
+    fn detect_syntax(
+        &self,
+        first_line: Option<&str>,
+        file_path: Option<&Path>,
+    ) -> &SyntaxReference {
         // 1. 嘗試從檔案路徑檢測
         if let Some(path) = file_path {
             // 從副檔名檢測
@@ -126,7 +137,7 @@ impl Highlighter {
         }
 
         // 2. 從第一行檢測（shebang）
-        if let Some(first_line) = content.lines().next() {
+        if let Some(first_line) = first_line {
             if first_line.starts_with("#!") {
                 if let Some(syntax) = SYNTAX_SET.find_syntax_by_first_line(first_line) {
                     return syntax;
@@ -136,20 +147,6 @@ impl Highlighter {
 
         // 3. 回退到純文字
         SYNTAX_SET.find_syntax_plain_text()
-    }
-
-    /// 將 syntect 顏色轉為 8-bit ANSI 色碼（相容模式）
-    fn as_8bit_terminal_escaped(&self, ranges: &[(Style, &str)]) -> String {
-        let mut output = String::new();
-
-        for (style, text) in ranges {
-            // 使用 ansi_colours 庫進行精確的 RGB -> 256 色映射（與 bat 相同）
-            let fg = style.foreground;
-            let color_code = ansi_colours::ansi256_from_rgb((fg.r, fg.g, fg.b));
-            output.push_str(&format!("\x1b[38;5;{}m{}\x1b[0m", color_code, text));
-        }
-
-        output
     }
 
     /// 列出可用主題
@@ -167,6 +164,62 @@ impl Highlighter {
     }
 }
 
+/// 逐行高亮器（有狀態）
+pub struct LineHighlighter<'a> {
+    highlighter: HighlightLines<'a>,
+    true_color: bool,
+    is_plain_text: bool,
+}
+
+impl<'a> LineHighlighter<'a> {
+    /// 高亮單行（保持語法狀態）
+    pub fn highlight_line(&mut self, line: &str) -> Result<String> {
+        // 如果是純文字，直接返回
+        if self.is_plain_text {
+            return Ok(line.to_string());
+        }
+
+        // 長行保護：超過 16KB 的行跳過語法高亮（與 bat 一致）
+        const MAX_LINE_LENGTH: usize = 16 * 1024;
+        if line.len() > MAX_LINE_LENGTH {
+            // 仍然需要高亮一個換行符來更新狀態
+            let _ = self
+                .highlighter
+                .highlight_line("\n", &SYNTAX_SET)
+                .context("Failed to highlight line")?;
+            return Ok(line.to_string());
+        }
+
+        // 逐行高亮
+        let ranges: Vec<(Style, &str)> = self
+            .highlighter
+            .highlight_line(line, &SYNTAX_SET)
+            .context("Failed to highlight line")?;
+
+        let escaped = if self.true_color {
+            as_24_bit_terminal_escaped(&ranges[..], false)
+        } else {
+            self.as_8bit_terminal_escaped(&ranges[..])
+        };
+
+        Ok(escaped)
+    }
+
+    /// 將 syntect 顏色轉為 8-bit ANSI 色碼（相容模式）
+    fn as_8bit_terminal_escaped(&self, ranges: &[(Style, &str)]) -> String {
+        let mut output = String::new();
+
+        for (style, text) in ranges {
+            // 使用 ansi_colours 庫進行精確的 RGB -> 256 色映射（與 bat 相同）
+            let fg = style.foreground;
+            let color_code = ansi_colours::ansi256_from_rgb((fg.r, fg.g, fg.b));
+            output.push_str(&format!("\x1b[38;5;{}m{}\x1b[0m", color_code, text));
+        }
+
+        output
+    }
+}
+
 /// 檢測終端是否支援 24-bit 真彩色
 pub fn supports_true_color() -> bool {
     std::env::var("COLORTERM")
@@ -181,19 +234,43 @@ mod tests {
     #[test]
     fn test_rust_syntax_detection() {
         let highlighter = Highlighter::new(None, true).unwrap();
-        let code = "fn main() { println!(\"Hello\"); }";
         let path = Path::new("test.rs");
 
-        let syntax = highlighter.detect_syntax(code, Some(path));
+        let syntax = highlighter.detect_syntax(None, Some(path));
         assert_eq!(syntax.name, "Rust");
     }
 
     #[test]
     fn test_shebang_detection() {
         let highlighter = Highlighter::new(None, true).unwrap();
-        let code = "#!/bin/bash\necho 'Hello'";
+        let first_line = "#!/bin/bash";
 
-        let syntax = highlighter.detect_syntax(code, None);
+        let syntax = highlighter.detect_syntax(Some(first_line), None);
         assert!(syntax.name.contains("Bash") || syntax.name.contains("Shell"));
+    }
+
+    #[test]
+    fn test_line_highlighter() {
+        let highlighter = Highlighter::new(None, true).unwrap();
+        let path = Path::new("test.rs");
+        let mut line_highlighter = highlighter.prepare_for_file(Some(path), None, None);
+
+        let result = line_highlighter.highlight_line("fn main() {\n");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_language_specification() {
+        let highlighter = Highlighter::new(None, true).unwrap();
+
+        // 測試指定語言
+        let mut line_highlighter = highlighter.prepare_for_file(None, None, Some("rust"));
+        let result = line_highlighter.highlight_line("fn main() {\n");
+        assert!(result.is_ok());
+
+        // 測試不區分大小寫
+        let mut line_highlighter2 = highlighter.prepare_for_file(None, None, Some("Rust"));
+        let result2 = line_highlighter2.highlight_line("fn main() {\n");
+        assert!(result2.is_ok());
     }
 }
